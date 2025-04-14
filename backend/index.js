@@ -7,12 +7,13 @@ import { connectDB, closeDB } from './config/db.js';  // Use pool instead of cli
 import UserAuthRoutes from './routes/UserAuth_routes.js';
 import UserSettingsRoutes from './routes/UserSettings_routes.js'; 
 import UserProfileRoutes from './routes/UserProfile_routes.js';
+import LLM_Routes from './routes/llm_routes.js';
 
 const app = express();
 dotenv.config();
-const PORT = 5000;
-const ServerUrl = `http://localhost:${PORT}`;
-const FrontEndUrl = `http://localhost:8081`;
+const PORT = process.env.PORT;
+const ServerUrl = process.env.SERVER_URL;
+const FrontEndUrl = process.env.FRONTEND_URL;
 
 // Middleware
 app.use(cors({
@@ -33,6 +34,7 @@ app.use((req, res, next) => {
 app.use("/api/auth", UserAuthRoutes);
 app.use("/api/usersettings", UserSettingsRoutes);
 app.use("/api/userprofile", UserProfileRoutes);
+app.use("/api/llm", LLM_Routes);
 
 // Serve static files from the React frontend
 const __filename = fileURLToPath(import.meta.url);

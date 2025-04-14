@@ -1,16 +1,9 @@
-import { getAppSettings } from '@/config';
 import React, { useState, useRef } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  FlatList,
-  TouchableOpacity,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  SafeAreaView,
+  View, Text, TextInput, FlatList, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform
 } from 'react-native';
+import { sendLLMMessage } from '@/api/llmApi';
+import { getAppSettings } from '@/config';
 
 type Message = {
   id: string;
@@ -18,7 +11,7 @@ type Message = {
   sender: 'user' | 'trainer' | 'thinking';
 };
 
-const ChatScreen = () => {
+const Chat = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -49,80 +42,36 @@ const ChatScreen = () => {
     setInput('');
     setIsThinking(true);
 
-    try {
-      const response = await fetch(`${getAppSettings().URL_LLM}/chat`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gemma3',
-          stream: false,
-          messages: [
-            {
-              role: 'user',
-              content: input,
-            },
-          ],
-        }),
-      });
+    const replyText = await sendLLMMessage(input, getAppSettings().LLM_MODEL);
 
-      const json = await response.json();
-      const replyText = json.message?.content || 'Trainer had nothing to say.';
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.id === 'thinking'
+          ? { id: Date.now().toString(), text: replyText, sender: 'trainer' }
+          : msg
+      )
+    );
 
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === 'thinking'
-            ? {
-                id: Date.now().toString(),
-                text: replyText,
-                sender: 'trainer',
-              }
-            : msg
-        )
-      );
-    } catch (error) {
-      console.error('Request failed:', error);
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === 'thinking'
-            ? {
-                id: Date.now().toString(),
-                text: 'Sorry, something went wrong.',
-                sender: 'trainer',
-              }
-            : msg
-        )
-      );
-    } finally {
-      setIsThinking(false);
-    }
+    setIsThinking(false);
   };
 
-  const renderItem = ({ item }: { item: Message }) => {
-    if (item.sender === 'thinking') {
-      return (
-        <View style={styles.thinkingBubble}>
-          <Text style={styles.thinkingText}>{item.text}</Text>
-        </View>
-      );
-    }
-
-    return (
-      <View
-        style={[
-          styles.messageBubble,
-          item.sender === 'user' ? styles.userBubble : styles.trainerBubble,
-        ]}
-      >
+  const renderItem = ({ item }: { item: Message }) => (
+    item.sender === 'thinking' ? (
+      <View style={styles.thinkingBubble}>
+        <Text style={styles.thinkingText}>{item.text}</Text>
+      </View>
+    ) : (
+      <View style={[
+        styles.messageBubble,
+        item.sender === 'user' ? styles.userBubble : styles.trainerBubble,
+      ]}>
         <Text style={styles.messageText}>{item.text}</Text>
       </View>
-    );
-  };
+    )
+  );
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
+    <KeyboardAvoidingView style={styles.container}
       behavior={Platform.select({ ios: 'padding', android: undefined })}
       keyboardVerticalOffset={90}
     >
@@ -156,7 +105,8 @@ const ChatScreen = () => {
   );
 };
 
-export default ChatScreen;
+export default Chat;
+
 
 const styles = StyleSheet.create({
   container: {
