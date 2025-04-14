@@ -1,3 +1,4 @@
+import { getAppSettings } from '@/config';
 import React, { useState, useRef } from 'react';
 import {
   View,
@@ -8,6 +9,7 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
+  SafeAreaView,
 } from 'react-native';
 
 type Message = {
@@ -48,7 +50,7 @@ const ChatScreen = () => {
     setIsThinking(true);
 
     try {
-      const response = await fetch('http://192.168.1.32:11434/api/chat', {
+      const response = await fetch(`${getAppSettings().URL_LLM}/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -158,6 +160,7 @@ export default ChatScreen;
 
 const styles = StyleSheet.create({
   container: {
+    marginTop: 50,
     flex: 1,
     backgroundColor: '#f8f8f8',
   },

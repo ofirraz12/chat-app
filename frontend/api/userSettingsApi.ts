@@ -1,6 +1,7 @@
+import { getAppSettings } from '@/config';
 import axios from 'axios';
 
-const API = axios.create({ baseURL: 'http://192.168.1.32:5000/api/usersettings' });
+const API = axios.create({ baseURL: `${getAppSettings().URL_backend}/usersettings` });
 
 // Create default settings for a user
 export const createUserSettings = async (userId: number) => {

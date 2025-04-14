@@ -1,8 +1,9 @@
+import { getAppSettings } from "@/config";
 import axios from "axios";
 
 export const uploadImage = async (formData: FormData) => {
   try {
-    const response = await axios.post("http://192.168.1.32:5000/api/userprofile/updateProfilePicture", formData, {
+    const response = await axios.post(`${getAppSettings().URL_backend}/userprofile/updateProfilePicture`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },

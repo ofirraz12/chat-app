@@ -1,8 +1,9 @@
 import axios from 'axios';
 import { updateUserSettings } from './userSettingsApi';
+import { getAppSettings } from '@/config';
 
 // Initialize Axios with a base URL for your API
-const API = axios.create({ baseURL: 'http://192.168.1.32:5000/api' });
+const API = axios.create({ baseURL: getAppSettings().URL_backend });
 
 const updateUserProfile = async (userId: number, profileInfo: {age: string, bio: string}) => {
   try {

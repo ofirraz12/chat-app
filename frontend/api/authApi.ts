@@ -1,7 +1,8 @@
 import axios from 'axios';
 import {User} from "@/types/auth"
+import { getAppSettings } from '@/config';
 
-const API = axios.create({ baseURL: 'http://192.168.1.32:5000/api' });
+const API = axios.create({ baseURL: getAppSettings().URL_backend });
 
 // Endpoints
 async function loginUser(loginData: {email: string, password: string}){
