@@ -17,7 +17,7 @@ const FrontEndUrl = process.env.FRONTEND_URL;
 
 // Middleware
 app.use(cors({
-    origin: FrontEndUrl, 
+    origin: '*', 
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     credentials: true 
 }));
