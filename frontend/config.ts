@@ -12,7 +12,7 @@ export const appConfig = {
 export const appSettings = {
   dev: {  
     URL_backend: "http://192.168.1.32:5000/api",
-    LLM_MODEL: "ollama"
+    LLM_MODEL: "groq"
   },
 
   prod: {  

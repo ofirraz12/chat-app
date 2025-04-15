@@ -10,6 +10,9 @@ const pool = new Pool({
   database: process.env.PG_DATABASE,
   password: String(process.env.PG_PASSWORD),
   port: process.env.PG_PORT,
+  ssl: {
+    rejectUnauthorized: false, // Render requires SSL, but allows self-signed
+  },
 });
 
 async function connectDB() {
