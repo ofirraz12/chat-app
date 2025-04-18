@@ -7,12 +7,12 @@ import folderIcon from '@/assets/icons/folderIcon.png'
 import notebookIcon from '@/assets/icons/notebookIcon1.png'
 import HomeIcon from "@/assets/icons/home.png"
 import ProfileIcon from "@/assets/icons/profile.png"
-import AdaptiveIcon from "@/assets/images/adaptive-icon.png"
-import splashImage from "@/assets/images/splash.png"
+import AdaptiveIcon from "@/assets/images/adaptive-icon1.png"
 import BackArrow from "@/assets/images/go_back_icon.png"
+
+import splashImage from "@/assets/images/splash-icon1.png"
 import splashVideo from "@/assets/videos/splash-video.mp4"
-
-
+import Logo from "@/assets/images/icon1.png"
 
 const LoginInputFieldsObject = [
     {lableName: "email", placeHolder: "example@gmail.com"},
@@ -30,6 +30,7 @@ const resetPasswordFiledObject =
     {lableName: "email", placeHolder: "example@gmail.com"}
 
 const icons = {
+    Logo,
     facebookIcon,
     twitterIcon,
     AdaptiveIcon,

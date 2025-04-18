@@ -4,15 +4,14 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+const AppState = process.env.APP_STATE // dev | prod
 const pool = new Pool({
   user: process.env.PG_USER,
   host: process.env.PG_HOST,
   database: process.env.PG_DATABASE,
   password: String(process.env.PG_PASSWORD),
   port: process.env.PG_PORT,
-  ssl: {
-    rejectUnauthorized: false, // Render requires SSL, but allows self-signed
-  },
+  ssl: AppState === 'prod' ? { rejectUnauthorized: false } : false, // Render requires SSL, but allows self-signed
 });
 
 async function connectDB() {

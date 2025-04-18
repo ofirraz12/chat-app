@@ -5,7 +5,7 @@ import LogoutButton from "@/components/auth/logoutButton";
 import { useAppSettings } from "@/context/appSettingsContext";
 import { useAuth } from "@/context/authContext";
 import { updateUserSettings } from "@/api/userSettingsApi";
-import { requestPermission } from "@/components/auth/permissionHandler";
+import { requestPermission } from "@/components/general/permissionHandler";
 
 // Define valid permission keys
 const PERMISSION_KEYS = ["camera_permission", "gallery_permission"] as const;

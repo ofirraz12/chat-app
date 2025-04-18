@@ -102,13 +102,7 @@ export default function Welcome() {
         Hello, <Text className="font-semibold">{user?.name || "Guest"}!</Text>
       </Text>
 
-      <Image
-        source={icons.AdaptiveIcon}
-        style={{
-          width: responsiveWidth(18),
-          height: responsiveHeight(22),
-        }}
-      />
+      <View style={{width: responsiveWidth(35), height: responsiveHeight(22)}}></View>
 
       <Text className="text-lg text-gray-600 mb-8 text-center max-w-lg leading-relaxed">
         This app helps you keep your information secure and accessible only to
