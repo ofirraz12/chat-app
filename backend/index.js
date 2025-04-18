@@ -30,6 +30,11 @@ app.use((req, res, next) => {
     next();
   });
 
+app.get('/', (req, res) => {
+    res.send('✅ API server is alive');
+});
+  
+
 // API Routes
 app.use("/api/auth", UserAuthRoutes);
 app.use("/api/usersettings", UserSettingsRoutes);
