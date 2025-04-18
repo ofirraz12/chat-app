@@ -11,7 +11,7 @@ import LLM_Routes from './routes/llm_routes.js';
 
 const app = express();
 dotenv.config();
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 5000;
 const ServerUrl = process.env.SERVER_URL;
 const FrontEndUrl = process.env.FRONTEND_URL;
 
