@@ -56,8 +56,14 @@ app.get("/health", (req, res) => {
 })
 
 app.get('*', (req, res) => {
-    res.sendFile(path.join(buildPath, 'index.html'));
-});
+    const indexPath = path.join(buildPath, 'index.html');
+  
+    if (fs.existsSync(indexPath)) {
+      res.sendFile(indexPath);
+    } else {
+      res.status(404).send('not found');
+    }
+  });
 
 // Start the server
 app.listen(PORT, () => {
