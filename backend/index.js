@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { connectDB, closeDB } from './config/db.js';  // Use pool instead of client
 import UserAuthRoutes from './routes/UserAuth_routes.js';
