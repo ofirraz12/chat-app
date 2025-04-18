@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { View, StyleSheet, Dimensions, Platform } from "react-native";
 import { Video, ResizeMode, AVPlaybackStatus } from "expo-av";
 import * as SplashScreen from "expo-splash-screen";
+import { videos } from "@/lib/consts"
 
 interface VideoSplashScreenProps {
   onFinish: () => void; // Callback when the video finishes
@@ -42,7 +43,7 @@ export default function VideoSplashScreen({ onFinish }: VideoSplashScreenProps) 
     <View style={styles.container}>
       <Video
         ref={videoRef}
-        source={require("@/assets/videos/splash-video.mp4")}
+        source={videos.splashVideo2}
         style={styles.video}
         resizeMode={ResizeMode.COVER}
         shouldPlay

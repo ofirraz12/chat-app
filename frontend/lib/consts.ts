@@ -12,7 +12,8 @@ import BackArrow from "@/assets/images/go_back_icon.png"
 
 import splashImage from "@/assets/images/splash-icon1.png"
 import splashVideo from "@/assets/videos/splash-video.mp4"
-import Logo from "@/assets/images/icon1.png"
+import splashVideo2 from "@/assets/videos/splash-video2.mp4"
+import Logo from "@/assets/images/icon3.png"
 
 const LoginInputFieldsObject = [
     {lableName: "email", placeHolder: "example@gmail.com"},
@@ -49,7 +50,8 @@ const images = {
 }
 
 const videos = {
-    splashVideo
+    splashVideo,
+    splashVideo2
 }
 
 export {LoginInputFieldsObject, RegisterInputFieldsObject, resetPasswordFiledObject, icons, images, videos};
