@@ -14,6 +14,7 @@ dotenv.config();
 const PORT = process.env.PORT || 5000;
 const ServerUrl = process.env.SERVER_URL;
 const FrontEndUrl = process.env.FRONTEND_URL;
+const AppState = process.env.APP_STATE
 
 // Middleware
 app.use(cors({
@@ -68,7 +69,21 @@ app.get('*', (req, res) => {
 // Start the server
 app.listen(PORT, () => {
     console.log(`Server is running on: ${ServerUrl}`);
+
+    if (AppState === 'prod') {
+        setInterval(async () => {
+          try {
+            const res = await fetch(`${ServerUrl}/health`);
+            const data = await res.json();
+            console.log('Self-ping success:', data);
+          } catch (err) {
+            console.error('Self-ping failed:', err.message);
+          }
+        }, 4 * 60 * 1000); // Every 4 minutes
+      }
 });
+
+
 
 // Graceful shutdown
 process.on('SIGINT', async () => {
