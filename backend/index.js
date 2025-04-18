@@ -30,11 +30,6 @@ app.use((req, res, next) => {
     next();
   });
 
-app.get('/', (req, res) => {
-    res.send('✅ API server is alive');
-});
-  
-
 // API Routes
 app.use("/api/auth", UserAuthRoutes);
 app.use("/api/usersettings", UserSettingsRoutes);
@@ -56,6 +51,10 @@ app.use('/get/profilePic',
 // app.use('/upload/profilePic', express.static(uploadDir));
 
 // Serve React app for any route not handled by API
+app.get("/health", (req, res) => {
+    res.status(200).json({status: 'ok'})
+})
+
 app.get('*', (req, res) => {
     res.sendFile(path.join(buildPath, 'index.html'));
 });
