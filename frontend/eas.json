@@ -6,11 +6,22 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "URL_backend": "https://chat-app-production-18b6.up.railway.app",
+        "LLM_MODEL": "groq",
+        "APP_STATE": "prod"
+      }
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "URL_backend": "https://chat-app-production-18b6.up.railway.app",
+        "LLM_MODEL": "groq",
+        "APP_STATE": "prod"
+      }
     },
+
     "production": {
       "autoIncrement": true
     }

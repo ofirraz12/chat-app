@@ -2,13 +2,14 @@ import axios from 'axios';
 import {User} from "@/types/auth"
 import { getAppSettings } from '@/config';
 
-const API = axios.create({ baseURL: getAppSettings().URL_backend });
+const { URL_backend} = getAppSettings();
 
+const API = axios.create({ baseURL: `${URL_backend}/auth` });
 // Endpoints
 async function loginUser(loginData: {email: string, password: string}){
-
+    console.log("whole path:", `${URL_backend}/auth`)
     try {
-        const response = await API.post('auth/login', loginData);
+        const response = await API.post('/login', loginData);
         if (response.data.success){
             console.log(response.data)
             return {success: true, message: "login-true", user: response.data.user}
@@ -32,7 +33,7 @@ async function loginUser(loginData: {email: string, password: string}){
 async function logoutUser(id: Number){
 
     try {
-        const response = await API.post('auth/logout', {id});
+        const response = await API.post('/logout', {id});
         if (response.data){
             return {success: response.data.success, message: response.data.message}
         }

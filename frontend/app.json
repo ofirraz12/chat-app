@@ -32,17 +32,7 @@
     ],
     "experiments": {
       "typedRoutes": true
-    },
-    "extra": {
-      "URL_backend": "https://chat-app-production-abd9.up.railway.app/api",
-      "LLM_MODEL": "groq",
-      "appState": "prod",
-      "router": {
-        "origin": false
-      },
-      "eas": {
-        "projectId": "8fc27180-0989-4489-be1d-0e62300eeb33"
-      }
     }
   }
 }
+

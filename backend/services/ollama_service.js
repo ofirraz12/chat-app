@@ -21,7 +21,17 @@ export async function handleOllamaRequest(prompt) {
             }
         );
 
-        return response.data.message.content;
+        let content = response.data.message.content;
+
+        // Sanitize response if wrapped in markdown blocks like ```json ... ```
+        const cleaned = content
+            .replace(/^```json/, '')
+            .replace(/^```/, '')
+            .replace(/```$/, '')
+            .trim();
+
+        return cleaned;
+        
     } catch (error) {
         console.error('Ollama service error:', error.response?.data || error.message);
         throw error;

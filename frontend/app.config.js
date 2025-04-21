@@ -1,20 +1,26 @@
 import 'dotenv/config';
 
-const eas = {
-  "projectId": "8fc27180-0989-4489-be1d-0e62300eeb33"
-}
+export default ({ config }) => {
+  const APP_STATE = process.env.EXPO_PUBLIC_APP_STATE ?? 'dev';
 
-export default ({ config }) => ({
-  ...config,
-  android: {
-    package: "com.ofir2203.BetaTrainer"
-  },
-  extra: {
-    eas: {
-      projectId: '8fc27180-0989-4489-be1d-0e62300eeb33'
+  const URL_backend =
+    APP_STATE === 'prod'
+      ? process.env.EXPO_PUBLIC_PROD_URL_BACKEND
+      : process.env.EXPO_PUBLIC_DEV_URL_BACKEND;
+
+  return {
+    ...config,
+    android: {
+      package: "com.ofir2203.BetaTrainer",
+      permissions: ["INTERNET"],
     },
-    URL_backend: process.env.URL_backend,
-    LLM_MODEL: process.env.LLM_MODEL,
-    appState: process.env.APP_STATE,
-  },
-});
+    extra: {
+      eas: {
+        projectId: '8fc27180-0989-4489-be1d-0e62300eeb33',
+      },
+      URL_backend,
+      LLM_MODEL: process.env.EXPO_PUBLIC_LLM_MODEL,
+      APP_STATE,
+    },
+  };
+};

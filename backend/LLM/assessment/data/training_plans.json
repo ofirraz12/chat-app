@@ -1,0 +1,31 @@
+{
+  "name": "training_plan_data",
+  "description": "Provides structured workout schedules for different weekly training frequencies.",
+  "contextType": "trainingPlans",
+  "useCases": [
+    "Building workout routines",
+    "Matching user availability to a plan",
+    "Personalized training recommendations"
+  ],
+  "plans": {
+    "3/week": {
+      "day 1": ["chest", "arms", "legs"],
+      "day 2": ["chest", "arms", "back"],
+      "day 3": ["arms", "legs", "back"]
+    },
+    "4/week": {
+      "day 1": ["chest", "back", "core"],
+      "day 2": ["legs", "arms", "shoulder"],
+      "day 3": ["chest", "back", "core"],
+      "day 4": ["legs", "arms", "shoulder"]
+    },
+    "6/week": {
+      "day 1": ["chest", "triceps", "front shoulder"],
+      "day 2": ["back", "biceps", "rear shoulder"],
+      "day 3": ["legs", "biceps", "triceps", "middle shoulder"],
+      "day 4": ["chest", "triceps", "front shoulder"],
+      "day 5": ["back", "biceps", "rear shoulder"],
+      "day 6": ["legs", "biceps", "triceps", "middle shoulder"]
+    }
+  }
+}

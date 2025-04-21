@@ -14,7 +14,6 @@ const app = express();
 dotenv.config();
 const PORT = process.env.PORT || 5000;
 const ServerUrl = process.env.SERVER_URL;
-const FrontEndUrl = process.env.FRONTEND_URL;
 const AppState = process.env.APP_STATE
 
 // Middleware
@@ -48,9 +47,6 @@ app.use(express.static(buildPath));
 // Serve static files for user uploads
 app.use('/get/profilePic',
      express.static(path.join(__dirname, 'UsersUploads/ProfilePic')));
-
-// const uploadDir = path.join(__dirname, 'UsersUploads/ProfilePic');
-// app.use('/upload/profilePic', express.static(uploadDir));
 
 // Serve React app for any route not handled by API
 app.get("/health", (req, res) => {

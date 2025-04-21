@@ -1,18 +1,19 @@
 // llmApi.ts
 import axios from 'axios';
 import { getAppSettings } from '@/config';
+const { URL_backend} = getAppSettings();
 
-const API = axios.create({ baseURL: getAppSettings().URL_backend });
+const API = axios.create({ baseURL: `${URL_backend}/llm` });
 
 async function sendLLMMessage(prompt: string, model: 'groq' | 'ollama') {
     try {
-        const response = await API.post('/llm/message', {
+        console.log("sending: ", model, prompt)
+        const response = await API.post('/message', {
             prompt,
             model,
         });
-
-        if (response.data?.message) {
-            return response.data.message;
+        if (response?.data?.response) {
+            return response.data.response;
         }
 
         return 'No response from trainer.';
