@@ -5,6 +5,8 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { connectDB, closeDB } from './config/db.js';  // Use pool instead of client
+import { loadSummaries, getSummaries } from './routes/llm_routes.js';
+
 import UserAuthRoutes from './routes/UserAuth_routes.js';
 import UserSettingsRoutes from './routes/UserSettings_routes.js'; 
 import UserProfileRoutes from './routes/UserProfile_routes.js';
@@ -16,6 +18,7 @@ const PORT = process.env.PORT || 5000;
 const ServerUrl = process.env.SERVER_URL;
 const AppState = process.env.APP_STATE
 
+loadSummaries()
 // Middleware
 app.use(cors({
     origin: '*', 

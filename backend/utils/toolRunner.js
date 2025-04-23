@@ -1,6 +1,6 @@
 import path from 'path';
 
-export async function runToolByName(name, params = {}) {
+export async function runToolByName(name, params) {
     const toolPath = path.join(process.cwd(), 'LLM', 'assessment', 'tools', `${name}.js`);
     const tool = (await import(`file://${toolPath}`)).default;
 

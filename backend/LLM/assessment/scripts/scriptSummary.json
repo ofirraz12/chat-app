@@ -1,0 +1,15 @@
+[
+    {
+      "name": "general_script",
+      "description": "Maintains tone and personality across all conversations."
+    },
+    {
+      "name": "beginner_script",
+      "description": "Guides beginners and clarifies goals for new users."
+    },
+    {
+      "name": "training_plan_script",
+      "description": "Helps the user choose the right training plan."
+    }
+  ]
+  

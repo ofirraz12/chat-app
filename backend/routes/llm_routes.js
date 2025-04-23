@@ -1,101 +1,86 @@
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
-import { buildToolkit } from '../utils/toolkitBuilder.js';
 import { handleGroqRequest } from '../services/groq_service.js';
 import { handleOllamaRequest } from '../services/ollama_service.js';
 import findFileRecursively from '../utils/findFile.js';
 import { runToolByName } from '../utils/toolRunner.js';
 
 const router = express.Router();
+const assessmentDir = path.join(process.cwd(), 'LLM', 'assessment');
+
+let cachedToolsSummary = null;
+let cachedScriptsSummary = null;
+
+export function loadSummaries() {
+    const toolSummaryPath = path.join(process.cwd(), 'LLM', 'assessment', 'tools', 'toolkitSummary.json');
+    const scriptSummaryPath = path.join(process.cwd(), 'LLM', 'assessment', 'scripts', 'scriptSummary.json');
+
+    if (!cachedToolsSummary || !cachedScriptsSummary) {
+        cachedToolsSummary = JSON.parse(fs.readFileSync(toolSummaryPath, 'utf-8'));
+        cachedScriptsSummary = JSON.parse(fs.readFileSync(scriptSummaryPath, 'utf-8'));
+        console.log('Summaries loaded into memory');
+    }
+}
+
+export function getSummaries() {
+    return { cachedToolsSummary, cachedScriptsSummary };
+}
 
 router.post('/message', async (req, res) => {
-    const { prompt, model } = req.body;
+    const { prompt, model, style = "onBoarding" } = req.body;
 
     if (!prompt || !model) {
         return res.status(400).json({ message: 'Prompt and model are required' });
     }
 
+    const user_goal = "lose weight"
     const user_prompt = prompt;
+    const user_style = style
 
     try {
-        const toolkit = buildToolkit();
-        const assessmentDir = path.join(process.cwd(), 'LLM', 'assessment');
-        const analysisScript =
-`You are a personal trainer assistant AI.
-Your job is to analyze the user's message and determine which tools and scripts from the provided toolkit are needed to address their request.
+        const { cachedToolsSummary: toolsSummary, cachedScriptsSummary: scriptsSummary } = getSummaries();
 
-Your response **must be a JSON array** of objects, where each item is:
-- A script: { "type": "script", "name": "general_script" }
-- A tool: { "type": "tool", "name": "get_training_plan", "params": { ... } }
+        const summarizedToolkit = {
+            tools: toolsSummary,
+            scripts: scriptsSummary
+          };
 
-✅ Example:
-[
-  { "type": "script", "name": "general_script" },
-  { "type": "tool", "name": "get_training_plan", "params": { "frequency": 3 } }
-]
+        const analysisScript = `
+          You are an intelligent planning assistant for a fitness trainer AI.
+          
+          Your job is to:
+          1. Think aloud and explain your reasoning **inside a <thinking> block**
+          2. Then return the selected tools and scripts **inside an <answer> JSON array block**
+          
+          User goal: ${user_goal}
+          User stage: ${user_style}
+          Your responses must work towards this goal examples can be: suggest a training plan, explore motivation, help them with scheduling, suggest beginner actions, etc.
 
-❌ Invalid: { "tools": [...] }
-❌ Invalid: ["general_script"]
-
-You must strictly follow this JSON format.
-
-If the required parameter is unknown (e.g. the user didn't say what the parameter is), do **not include the tool yet** — just return the script(s) and wait for more information.
-
-Guidelines:
-- Carefully read the user's message and understand the intent and emotional context.
-- choose to give a user a training plan so you will need to training plan data so use get training plan, you will need the training plan script
-- After selecting relevant tools, check for requiredParams.
-    If any parameter is missing from the user message, **do not run the tool yet**.
-    Instead, return a message that asks the user for that specific information.
-- Always include "general_script" because it sets the tone for the AI in the whole app.
-- DO NOT write anything except the array.
-
-Toolkit:
-${JSON.stringify(toolkit, null, 2)}
-
-User message:
-"${user_prompt}"
-`;
-        // 1. Tool analysis via LLM
-        const analysisScript1 = `
-You are a personal trainer assistant AI.
-Your job is to analyze the user's message and determine which tools and scripts from the provided toolkit are needed to address their request.
-
-Your response **must be a JSON array** of objects, where each item is:
-- A script: { "type": "script", "name": "general_script" }
-- A tool: { "type": "tool", "name": "get_training_plan", "params": { ... } }
-
-✅ Example:
-[
-  { "type": "script", "name": "general_script" },
-  { "type": "tool", "name": "get_training_plan", "params": { "frequency": 3 } }
-]
-
-❌ Invalid: { "tools": [...] }
-❌ Invalid: ["general_script"]
-
-You must strictly follow this JSON format.
-
-If the required parameter is unknown (e.g. the user didn't say what the parameter is), do **not include the tool yet** — just return the script(s) and wait for more information.
-
-Guidelines:
-- Carefully read the user's message and understand the intent and emotional context.
-- After selecting relevant tools, check for requiredParams.
-    If any parameter is missing from the user message, **do not run the tool yet**.
-    Instead, return a message that asks the user for that specific information.
-- Pay attention to **all fields**, but especially **useCases**, when deciding what to select.
-- Always include "general_script" because it sets the tone for the AI in the whole app.
-- Select only the tools/scripts that are relevant.
-- If none are relevant, return: ["general_script"]
-- DO NOT write anything except the array.
-
-Toolkit:
-${JSON.stringify(toolkit, null, 2)}
-
-User message:
-"${user_prompt}"
-`;
+          🧠 What to do:
+          - Analyze user intent (goal, mindset, hesitation)
+          - understnad what tools and scripts you need or will need soon
+          
+          🛠️ When you have all required parameters for a tool, you can include it.
+          If anything is missing, just ask the user — don’t call the tool yet.
+          
+          Respond format:
+          <thinking>
+          Explain what you know, what you're still missing, and why you chose each script/tool.
+          </thinking>
+          <answer>
+          [
+            { "type": "script", "name": "..." },
+            { "type": "tool", "name": "...", "params": { ... } }
+          ]
+          </answer>
+          
+          Toolkit:
+          ${JSON.stringify(summarizedToolkit, null, 2)}
+          
+          User message:
+          "${user_prompt}"
+          `;
 
 console.log("analysisScript: ", analysisScript)
 
@@ -108,15 +93,24 @@ console.log("analysisScript: ", analysisScript)
             return res.status(400).json({ message: 'Invalid model selection' });
         }
 
-        console.log('LLM tool selection response:', toolSelectionResponse);
-
-        let selectedToolNames;
+        let reasoning = '';
+        let selectedToolNames = [];
+        
         try {
-            selectedToolNames = JSON.parse(toolSelectionResponse);
+            const thinkingMatch = toolSelectionResponse.match(/<thinking>([\s\S]*?)<\/thinking>/i);
+            const answerMatch = toolSelectionResponse.match(/<answer>([\s\S]*?)<\/answer>/i);
+            if (!answerMatch) throw new Error('Missing <answer> block');
+            const jsonRaw = answerMatch[1].replace(/```(?:json)?/g, '').trim();
+            reasoning = thinkingMatch ? thinkingMatch[1].trim() : '[No reasoning provided]';
+            selectedToolNames = JSON.parse(jsonRaw);
+        
+            console.log('🧠 LLM thinking:\n', reasoning);
+        
         } catch (error) {
-            console.error('Error parsing tool list:', error.message);
-            return res.status(500).json({ message: 'Invalid tool selection format' });
+            console.error('❌ Failed to parse LLM output:', error.message);
+            return res.status(500).json({ message: 'Invalid format returned from LLM' });
         }
+        
 
         // 2. Load scripts and execute tools
         const scripts = [];
@@ -146,6 +140,9 @@ console.log("analysisScript: ", analysisScript)
             .join('\n\n');
 
         const finalPrompt = `
+        importent instructions:
+         - this is not a markdown chat this is text so do not add things like ** or ##
+         - remember the goal of the conversation is ${user_goal}
         ${combinedScripts}
 
         ${toolOutputText ? `Tool outputs:\n${toolOutputText}\n\n` : ''}
