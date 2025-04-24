@@ -1,6 +1,5 @@
 import React from "react";
 import { View, StyleSheet, SafeAreaView, Text } from "react-native";
-import PostGrid from "@/components/profile/PostGrid";
 import ProfileHeader from "@/components/profile/ProfileHeader";
 import { responsiveHeight as RH, responsiveWidth as RW } from "react-native-responsive-dimensions";
 

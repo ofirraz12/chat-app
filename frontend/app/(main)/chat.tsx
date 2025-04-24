@@ -8,7 +8,8 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
-  AppState 
+  AppState,
+  Alert
 } from 'react-native';
 import { sendLLMMessage } from '@/api/llmApi';
 import { getAppSettings } from '@/config';
@@ -19,6 +20,9 @@ import { ChatSession, Message } from '@/types/chat';
 import { SupportedModel } from '@/types/llm';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { getAllConversations, updateConversation, addConversation } from '@/api/chatApi';
+import { useAuth } from '@/context/authContext';
+
 const Chat = () => {
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -26,12 +30,46 @@ const Chat = () => {
   const [isThinking, setIsThinking] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
   const flatListRef = useRef<FlatList>(null);
+  const { user } = useAuth();
+
+  if (!user || !user.id) return null;
+  const userId = user.id;
 
   useEffect(() => {
-    const session = createNewSession(0);
-    setChatSessions([session]);
-    setActiveSessionId(session.sessionId);
-  }, []); 
+    const loadConversations = async () => {
+      try {
+        const result = await getAllConversations(userId);
+  
+        if (result.success && result.data.length > 0) {
+          // Map DB rows to ChatSession objects
+          const sessions: ChatSession[] = result.data.map((row: any) => ({
+            sessionId: row.session_id,
+            name: row.title,
+            messages: row.conversation.map((msg: any) => ({
+              id: `${Date.parse(msg.send_at)}-${msg.role}`, // create a unique ID
+              text: msg.message,
+              sender: msg.role === 'user' ? 'user' : 'trainer',
+              send_at: msg.send_at, // optional if you want to use it
+            })),
+          }));
+  
+          // Always create a new session FIRST
+          const newSession = createNewSession(sessions.length);
+          setChatSessions([newSession, ...sessions]);
+          setActiveSessionId(newSession.sessionId); // Always start fresh
+        } else {
+          // No old chats? Just create a new one
+          const newSession = createNewSession(0);
+          setChatSessions([newSession]);
+          setActiveSessionId(newSession.sessionId);
+        }
+      } catch (error) {
+        console.error('Failed to load conversations:', error);
+      }
+    };
+  
+    loadConversations();
+  }, []);
   
   useEffect(() => {
     const handleAppStateChange = async (nextAppState: string) => {
@@ -54,8 +92,20 @@ const Chat = () => {
     chatSessions.find(session => session.sessionId === activeSessionId);
 
   const saveChatToBackend = async (session: ChatSession) => {
-      console.log("saveChatToBackend")
+    try {
+      if (session.name === 'New Chat') {
+        // First-time save
+        await addConversation(userId, session.sessionId, session.name, session.messages);
+      } else {
+        // Existing session update
+        await updateConversation(userId, session.sessionId, session.name, session.messages);
+      }
+      console.log(`Saved session ${session.sessionId}`);
+    } catch (error) {
+      console.error('Failed to save chat:', error);
+    }
   };
+  
 
   const getChatNameFromLLM = async (message: string): Promise<string> => {
     // For now, simulate with a simple logic.
@@ -166,13 +216,11 @@ const Chat = () => {
           <SideMenu
             List={chatSessions.map(s => ({ Id: s.sessionId, name: s.name }))}
             onSelect={async (sessionId) => {
-              // 1. Save current session if needed
               const currentSession = chatSessions.find(s => s.sessionId === activeSessionId);
               if (currentSession && shouldSaveChat(currentSession)) {
                 await saveChatToBackend(currentSession);
               }
-
-              // 2. Switch session
+            
               const session = switchSession(sessionId, chatSessions);
               setActiveSessionId(session.sessionId);
               setMenuVisible(false);
@@ -185,7 +233,7 @@ const Chat = () => {
         <FlatList
           ref={flatListRef}
           data={getCurrentSession()?.messages || []}
-          keyExtractor={(item, index) => item.id + index}
+          keyExtractor={(item, index) => `${item.id || index}`}
           renderItem={renderItem}
           contentContainerStyle={styles.chatContainer}
           onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
