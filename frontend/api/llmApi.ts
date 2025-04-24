@@ -1,11 +1,12 @@
 // llmApi.ts
 import axios from 'axios';
 import { getAppSettings } from '@/config';
+import {SupportedModel} from '@/types/llm' 
 const { URL_backend} = getAppSettings();
 
 const API = axios.create({ baseURL: `${URL_backend}/llm` });
 
-async function sendLLMMessage(prompt: string, model: 'groq' | 'ollama') {
+async function sendLLMMessage(prompt: string, model: SupportedModel) {
     try {
         console.log("sending: ", model, prompt)
         const response = await API.post('/message', {

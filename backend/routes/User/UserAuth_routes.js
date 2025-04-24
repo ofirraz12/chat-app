@@ -1,7 +1,7 @@
 import express from 'express';
-import { createSettings } from '../models/UserSettings_model.js';
+import { createSettings } from '../../models/User/UserSettings_model.js';
 const router = express.Router();
-import { createUser, LoginUser, SignOut } from '../models/UserAuth_model.js';
+import { createUser, LoginUser, SignOut } from '../../models/User/UserAuth_model.js';
 
 // Route to create a new user (Sign Up)
 router.post('/signup', async (req, res) => {

@@ -1,4 +1,4 @@
-import { pool } from '../config/db.js';
+import { pool } from '../../config/db.js';
 
 // Create settings for a user
 const createSettings = async (userId, settings = {}) => {

@@ -1,5 +1,5 @@
-import { pool } from '../config/db.js';
-import isAgeValid from '../utils/validation functions/isAgeValid.js';
+import { pool } from '../../config/db.js';
+import isAgeValid from '../../utils/validation functions/isAgeValid.js';
 
 const MAX_AGE = 120;
 const MIN_AGE = 5;

@@ -1,10 +1,10 @@
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
-import { handleGroqRequest } from '../services/groq_service.js';
-import { handleOllamaRequest } from '../services/ollama_service.js';
-import findFileRecursively from '../utils/findFile.js';
-import { runToolByName } from '../utils/toolRunner.js';
+import { handleGroqRequest } from '../../services/groq_service.js';
+import { handleOllamaRequest } from '../../services/ollama_service.js';
+import findFileRecursively from '../../utils/findFile.js';
+import { runToolByName } from '../../utils/toolRunner.js';
 
 const router = express.Router();
 const assessmentDir = path.join(process.cwd(), 'LLM', 'assessment');

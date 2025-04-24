@@ -1,6 +1,6 @@
 import express from 'express';
 const router = express.Router();
-const { createSettings, getSettings, updateSettings } = await import('../models/UserSettings_model.js');
+const { createSettings, getSettings, updateSettings } = await import('../../models/User/UserSettings_model.js');
 
 // Create settings for a user
 router.post('/create', async (req, res) => {

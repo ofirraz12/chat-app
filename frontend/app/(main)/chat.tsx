@@ -1,59 +1,135 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
-  View, Text, TextInput, FlatList, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform
+  View,
+  Text,
+  TextInput,
+  FlatList,
+  TouchableOpacity,
+  StyleSheet,
+  KeyboardAvoidingView,
+  Platform,
+  AppState 
 } from 'react-native';
 import { sendLLMMessage } from '@/api/llmApi';
 import { getAppSettings } from '@/config';
+import SideMenu from '@/components/general/sideMenu';
+import { createNewSession, shouldSaveChat, switchSession } from '@/utils/chat_utils';
 
-type Message = {
-  id: string;
-  text: string;
-  sender: 'user' | 'trainer' | 'thinking';
-};
+import { ChatSession, Message } from '@/types/chat';
+import { SupportedModel } from '@/types/llm';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const Chat = () => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      text: 'Hi! How can I help you today?',
-      sender: 'trainer',
-    },
-  ]);
+  const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const [isThinking, setIsThinking] = useState(false);
+  const [menuVisible, setMenuVisible] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
-  const sendMessage = async () => {
-    if (input.trim() === '' || isThinking) return;
+  useEffect(() => {
+    const session = createNewSession(0);
+    setChatSessions([session]);
+    setActiveSessionId(session.sessionId);
+  }, []); 
+  
+  useEffect(() => {
+    const handleAppStateChange = async (nextAppState: string) => {
+      if (nextAppState === 'background' || nextAppState === 'inactive') {
+        const currentSession = chatSessions.find(s => s.sessionId === activeSessionId);
+        if (currentSession) {
+          await saveChatToBackend(currentSession);
+        }
+      }
+    };
+  
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+  
+    return () => {
+      subscription.remove();
+    };
+  }, [chatSessions, activeSessionId]);
 
+  const getCurrentSession = (): ChatSession | undefined =>
+    chatSessions.find(session => session.sessionId === activeSessionId);
+
+  const saveChatToBackend = async (session: ChatSession) => {
+      console.log("saveChatToBackend")
+  };
+
+  const getChatNameFromLLM = async (message: string): Promise<string> => {
+    // For now, simulate with a simple logic.
+    // Replace with your LLM integration later.
+    if (message.length > 10){
+      return `${message.slice(0, 10)}...`;  
+    }
+    return message;
+  };
+
+  const sendMessage = async () => {
+    if (input.trim() === '' || isThinking || !activeSessionId) return;
+  
     const userMessage: Message = {
       id: Date.now().toString(),
       text: input,
       sender: 'user',
     };
-
+  
     const thinkingMessage: Message = {
       id: 'thinking',
       text: 'Trainer is thinking...',
       sender: 'thinking',
     };
-
-    setMessages((prev) => [...prev, userMessage, thinkingMessage]);
-    setInput('');
-    setIsThinking(true);
-
-    const replyText = await sendLLMMessage(input, getAppSettings().LLM_MODEL);
-
-    setMessages((prev) =>
-      prev.map((msg) =>
-        msg.id === 'thinking'
-          ? { id: Date.now().toString(), text: replyText, sender: 'trainer' }
-          : msg
+  
+    // Add user + thinking
+    setChatSessions(prevSessions =>
+      prevSessions.map(session =>
+        session.sessionId === activeSessionId
+          ? { ...session, messages: [...session.messages, userMessage, thinkingMessage] }
+          : session
       )
     );
-
+  
+    setInput('');
+    setIsThinking(true);
+  
+    const replyText = await sendLLMMessage(input, getAppSettings().LLM_MODEL as SupportedModel);
+  
+    const currentSession = chatSessions.find(s => s.sessionId === activeSessionId);
+    let updatedName = currentSession?.name || 'New Chat';
+  
+    if (updatedName === 'New Chat') {
+      updatedName = await getChatNameFromLLM(input);
+    }
+  
+    let updatedSession: ChatSession | undefined;
+  
+    setChatSessions(prevSessions => {
+      return prevSessions.map(session => {
+        if (session.sessionId === activeSessionId) {
+          const updatedMessages: Message[] = session.messages.map((msg): Message =>
+            msg.id === 'thinking'
+              ? { id: Date.now().toString(), text: replyText, sender: 'trainer' }
+              : msg
+          );
+  
+          const updated: ChatSession = {
+            ...session,
+            messages: updatedMessages,
+            name: updatedName,
+          };
+  
+          updatedSession = updated;
+          return updated;
+        }
+        return session;
+      });
+    });
+  
     setIsThinking(false);
   };
+  
+  
 
   const renderItem = ({ item }: { item: Message }) => (
     item.sender === 'thinking' ? (
@@ -71,48 +147,101 @@ const Chat = () => {
   );
 
   return (
-    <KeyboardAvoidingView style={styles.container}
-      behavior={Platform.select({ ios: 'padding', android: undefined })}
-      keyboardVerticalOffset={90}
-    >
-      <FlatList
-        ref={flatListRef}
-        data={messages}
-        keyExtractor={(item, index) => item.id + index}
-        renderItem={renderItem}
-        contentContainerStyle={styles.chatContainer}
-        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-      />
+    <SafeAreaView style={{ flex: 1 }}>
+      <KeyboardAvoidingView style={styles.container}
+        behavior={Platform.select({ ios: 'padding', android: undefined })}
+        keyboardVerticalOffset={90}
+      >
+        {/* Header with chat session name */}
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>
+            {getCurrentSession()?.name || 'Chat'}
+          </Text>
+          <TouchableOpacity style={styles.menuButton} onPress={() => setMenuVisible(true)}>
+            <Text style={styles.menuButtonText}>☰</Text>
+          </TouchableOpacity>
+        </View>
 
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.input}
-          value={input}
-          onChangeText={setInput}
-          placeholder="Type your message..."
-          placeholderTextColor="#999"
-          editable={!isThinking}
+        {menuVisible && (
+          <SideMenu
+            List={chatSessions.map(s => ({ Id: s.sessionId, name: s.name }))}
+            onSelect={async (sessionId) => {
+              // 1. Save current session if needed
+              const currentSession = chatSessions.find(s => s.sessionId === activeSessionId);
+              if (currentSession && shouldSaveChat(currentSession)) {
+                await saveChatToBackend(currentSession);
+              }
+
+              // 2. Switch session
+              const session = switchSession(sessionId, chatSessions);
+              setActiveSessionId(session.sessionId);
+              setMenuVisible(false);
+            }}
+            onClose={() => setMenuVisible(false)}
+            setMenuVisible={setMenuVisible}
+          />
+        )}
+
+        <FlatList
+          ref={flatListRef}
+          data={getCurrentSession()?.messages || []}
+          keyExtractor={(item, index) => item.id + index}
+          renderItem={renderItem}
+          contentContainerStyle={styles.chatContainer}
+          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
         />
-        <TouchableOpacity
-          onPress={sendMessage}
-          style={[styles.sendButton, isThinking && styles.disabledButton]}
-          disabled={isThinking}
-        >
-          <Text style={styles.sendText}>Send</Text>
-        </TouchableOpacity>
-      </View>
-    </KeyboardAvoidingView>
+
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={styles.input}
+            value={input}
+            onChangeText={setInput}
+            placeholder="Type your message..."
+            placeholderTextColor="#999"
+            editable={!isThinking}
+          />
+          <TouchableOpacity
+            onPress={sendMessage}
+            style={[styles.sendButton, isThinking && styles.disabledButton]}
+            disabled={isThinking}
+          >
+            <Text style={styles.sendText}>Send</Text>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
 export default Chat;
 
-
 const styles = StyleSheet.create({
   container: {
-    marginTop: 50,
+    marginTop: 15,
     flex: 1,
     backgroundColor: '#f8f8f8',
+  },
+  header: {
+    height: 50,
+    backgroundColor: '#ddd',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    position: 'relative',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  menuButton: {
+    position: 'absolute',
+    right: 16,
+  },
+  menuButtonText: {
+    fontSize: 20,
+    color: '#333',
   },
   chatContainer: {
     padding: 16,

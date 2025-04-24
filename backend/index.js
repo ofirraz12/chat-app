@@ -5,12 +5,13 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { connectDB, closeDB } from './config/db.js';  // Use pool instead of client
-import { loadSummaries, getSummaries } from './routes/llm_routes.js';
+import { loadSummaries, getSummaries } from './routes/LLM/llm_routes.js';
 
-import UserAuthRoutes from './routes/UserAuth_routes.js';
-import UserSettingsRoutes from './routes/UserSettings_routes.js'; 
-import UserProfileRoutes from './routes/UserProfile_routes.js';
-import LLM_Routes from './routes/llm_routes.js';
+import UserAuthRoutes from './routes/User/UserAuth_routes.js';
+import UserSettingsRoutes from './routes/User/UserSettings_routes.js'; 
+import UserProfileRoutes from './routes/User/UserProfile_routes.js';
+import LLM_Routes from './routes/LLM/llm_routes.js';
+import ConvRoutes from './routes/LLM/UserConvo_routes.js'
 
 const app = express();
 dotenv.config();
@@ -39,6 +40,7 @@ app.use("/api/auth", UserAuthRoutes);
 app.use("/api/usersettings", UserSettingsRoutes);
 app.use("/api/userprofile", UserProfileRoutes);
 app.use("/api/llm", LLM_Routes);
+app.use("/api/llm/conversation", ConvRoutes);
 
 // Serve static files from the React frontend
 const __filename = fileURLToPath(import.meta.url);

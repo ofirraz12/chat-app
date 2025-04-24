@@ -5,10 +5,10 @@ const {
     deleteProfile,
     getProfile,
     addProfilePicture
-  } = await import('../models/UserProfile_model.js');
+  } = await import('../../models/User/UserProfile_model.js');
 
 import rateLimit from 'express-rate-limit';
-import { upload } from '../utils/FileUtils.js';
+import { upload } from '../../utils/FileUtils.js';
 const URL = "http://192.168.1.32:5000"
 
 

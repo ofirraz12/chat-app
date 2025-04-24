@@ -1,5 +1,5 @@
 import bcrypt from 'bcrypt';
-import { pool } from '../config/db.js'; // Using pool from db.js
+import { pool } from '../../config/db.js'; // Using pool from db.js
 import { createProfile } from './UserProfile_model.js';
 
 // Create a new user (Sign Up)
