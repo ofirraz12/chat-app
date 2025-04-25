@@ -1,27 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  FlatList,
-  TouchableOpacity,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  AppState,
-  Alert
+  View, Text, TextInput, FlatList, TouchableOpacity, StyleSheet,
+  KeyboardAvoidingView, Platform, AppState
 } from 'react-native';
-import { sendLLMMessage } from '@/api/llmApi';
 import { getAppSettings } from '@/config';
 import SideMenu from '@/components/general/sideMenu';
-import { createNewSession, shouldSaveChat, switchSession } from '@/utils/chat_utils';
-
+import { createNewSession, switchSession } from '@/utils/chat_utils';
 import { ChatSession, Message } from '@/types/chat';
 import { SupportedModel } from '@/types/llm';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-import { getAllConversations, updateConversation, addConversation } from '@/api/chatApi';
 import { useAuth } from '@/context/authContext';
+
+import {
+  createSession, sendMessage, getAllSessions, getSessionMessages, updateSessionTitle
+} from '@/api/chatApi';
 
 const Chat = () => {
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
@@ -31,182 +23,145 @@ const Chat = () => {
   const [menuVisible, setMenuVisible] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   const { user } = useAuth();
-
   if (!user || !user.id) return null;
   const userId = user.id;
 
+  // Load sessions on mount
   useEffect(() => {
-    const loadConversations = async () => {
+    const loadSessions = async () => {
       try {
-        const result = await getAllConversations(userId);
+        const result = await getAllSessions(userId);
+        let sessions: ChatSession[] = [];
   
         if (result.success && result.data.length > 0) {
-          // Map DB rows to ChatSession objects
-          const sessions: ChatSession[] = result.data.map((row: any) => ({
+          sessions = result.data.map((row: any) => ({
             sessionId: row.session_id,
             name: row.title,
-            messages: row.conversation.map((msg: any) => ({
-              id: `${Date.parse(msg.send_at)}-${msg.role}`, // create a unique ID
-              text: msg.message,
-              sender: msg.role === 'user' ? 'user' : 'trainer',
-              send_at: msg.send_at, // optional if you want to use it
-            })),
+            messages: [],
           }));
-  
-          // Always create a new session FIRST
-          const newSession = createNewSession(sessions.length);
-          setChatSessions([newSession, ...sessions]);
-          setActiveSessionId(newSession.sessionId); // Always start fresh
-        } else {
-          // No old chats? Just create a new one
-          const newSession = createNewSession(0);
-          setChatSessions([newSession]);
-          setActiveSessionId(newSession.sessionId);
         }
+  
+        // Create a new session locally, NOT saved to backend
+        const newSession = await createNewSession(userId);
+        setChatSessions([newSession, ...sessions]);
+        setActiveSessionId(newSession.sessionId);
+  
       } catch (error) {
-        console.error('Failed to load conversations:', error);
+        console.error('Failed to load sessions:', error);
       }
     };
-  
-    loadConversations();
+    loadSessions();
   }, []);
-  
-  useEffect(() => {
-    const handleAppStateChange = async (nextAppState: string) => {
-      if (nextAppState === 'background' || nextAppState === 'inactive') {
-        const currentSession = chatSessions.find(s => s.sessionId === activeSessionId);
-        if (currentSession) {
-          await saveChatToBackend(currentSession);
-        }
+
+  // Fetch messages for session when switching
+  const loadMessagesForSession = async (sessionId: string) => {
+    try {
+      const result = await getSessionMessages(userId, sessionId);
+      if (result.success) {
+        const messages: Message[] = result.data.map((msg: any) => ({
+          id: `${Date.parse(msg.send_at)}-${msg.role}`,
+          text: msg.message,
+          sender: msg.role,
+          send_at: msg.send_at,
+        }));
+        setChatSessions(prev =>
+          prev.map(s =>
+            s.sessionId === sessionId ? { ...s, messages } : s
+          )
+        );
       }
-    };
-  
-    const subscription = AppState.addEventListener('change', handleAppStateChange);
-  
-    return () => {
-      subscription.remove();
-    };
-  }, [chatSessions, activeSessionId]);
+    } catch (error) {
+      console.error('Failed to load messages:', error);
+    }
+  };
 
   const getCurrentSession = (): ChatSession | undefined =>
     chatSessions.find(session => session.sessionId === activeSessionId);
 
-  const saveChatToBackend = async (session: ChatSession) => {
-    try {
-      if (session.name === 'New Chat') {
-        // First-time save
-        await addConversation(userId, session.sessionId, session.name, session.messages);
-      } else {
-        // Existing session update
-        await updateConversation(userId, session.sessionId, session.name, session.messages);
-      }
-      console.log(`Saved session ${session.sessionId}`);
-    } catch (error) {
-      console.error('Failed to save chat:', error);
-    }
-  };
-  
-
   const getChatNameFromLLM = async (message: string): Promise<string> => {
-    // For now, simulate with a simple logic.
-    // Replace with your LLM integration later.
-    if (message.length > 10){
-      return `${message.slice(0, 10)}...`;  
-    }
+    if (message.length > 10) return `${message.slice(0, 10)}...`;
     return message;
   };
 
-  const sendMessage = async () => {
+  const handleSendMessage = async () => {
     if (input.trim() === '' || isThinking || !activeSessionId) return;
   
     const userMessage: Message = {
-      id: Date.now().toString(),
+      id: Date().toString(),
       text: input,
       sender: 'user',
     };
   
-    const thinkingMessage: Message = {
-      id: 'thinking',
-      text: 'Trainer is thinking...',
-      sender: 'thinking',
-    };
-  
-    // Add user + thinking
-    setChatSessions(prevSessions =>
-      prevSessions.map(session =>
-        session.sessionId === activeSessionId
-          ? { ...session, messages: [...session.messages, userMessage, thinkingMessage] }
-          : session
-      )
-    );
+    setChatSessions(prev => prev.map(session =>
+      session.sessionId === activeSessionId
+        ? { ...session, messages: [...session.messages, userMessage, { id: 'thinking', text: 'Trainer is thinking...', sender: 'thinking' }] }
+        : session
+    ));
   
     setInput('');
     setIsThinking(true);
   
-    const replyText = await sendLLMMessage(input, getAppSettings().LLM_MODEL as SupportedModel);
+    // Send message to backend
+    const response = await sendMessage(userId, activeSessionId, 'user', input, new Date().toLocaleString("sv-SE", { timeZone: "Asia/Jerusalem" }), getAppSettings().LLM_MODEL as SupportedModel);
   
-    const currentSession = chatSessions.find(s => s.sessionId === activeSessionId);
-    let updatedName = currentSession?.name || 'New Chat';
+    const trainerReply = response?.trainer_reply || 'Sorry, no reply.';
   
-    if (updatedName === 'New Chat') {
-      updatedName = await getChatNameFromLLM(input);
+    // Handle sessionId change from backend
+    let updatedSessionId = activeSessionId;
+    if (response?.session_id && response.session_id !== activeSessionId) {
+      updatedSessionId = response.session_id;
+      setActiveSessionId(response.session_id);
+      setChatSessions(prev => prev.map(session =>
+        session.sessionId === activeSessionId
+          ? { ...session, sessionId: response.session_id }
+          : session
+      ));
     }
   
-    let updatedSession: ChatSession | undefined;
+    // Update name if needed
+    const currentSession = chatSessions.find(session => session.sessionId === updatedSessionId);
+    let updatedName = currentSession?.name || 'New Chat';
   
-    setChatSessions(prevSessions => {
-      return prevSessions.map(session => {
-        if (session.sessionId === activeSessionId) {
-          const updatedMessages: Message[] = session.messages.map((msg): Message =>
+    if (response?.title && updatedName === 'New Chat') {
+      updatedName = response.title;
+      await updateSessionTitle(userId, updatedSessionId, updatedName);
+    }
+  
+    // Update trainer reply
+    setChatSessions(prev =>
+      prev.map(session => {
+        if (session.sessionId === updatedSessionId) {
+          const updatedMessages: Message[] = session.messages.map(msg =>
             msg.id === 'thinking'
-              ? { id: Date.now().toString(), text: replyText, sender: 'trainer' }
+              ? { id: Date.now().toString(), text: trainerReply, sender: 'trainer' as 'trainer' }
               : msg
           );
-  
-          const updated: ChatSession = {
-            ...session,
-            messages: updatedMessages,
-            name: updatedName,
-          };
-  
-          updatedSession = updated;
-          return updated;
+          return { ...session, messages: updatedMessages, name: updatedName };
         }
         return session;
-      });
-    });
+      })
+    );
   
     setIsThinking(false);
   };
   
-  
 
   const renderItem = ({ item }: { item: Message }) => (
     item.sender === 'thinking' ? (
-      <View style={styles.thinkingBubble}>
-        <Text style={styles.thinkingText}>{item.text}</Text>
-      </View>
+      <View style={styles.thinkingBubble}><Text style={styles.thinkingText}>{item.text}</Text></View>
     ) : (
       <View style={[
         styles.messageBubble,
         item.sender === 'user' ? styles.userBubble : styles.trainerBubble,
-      ]}>
-        <Text style={styles.messageText}>{item.text}</Text>
-      </View>
+      ]}><Text style={styles.messageText}>{item.text}</Text></View>
     )
   );
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
-      <KeyboardAvoidingView style={styles.container}
-        behavior={Platform.select({ ios: 'padding', android: undefined })}
-        keyboardVerticalOffset={90}
-      >
-        {/* Header with chat session name */}
+      <KeyboardAvoidingView style={styles.container} behavior={Platform.select({ ios: 'padding', android: undefined })} keyboardVerticalOffset={90}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>
-            {getCurrentSession()?.name || 'Chat'}
-          </Text>
+          <Text style={styles.headerTitle}>{getCurrentSession()?.name || 'Chat'}</Text>
           <TouchableOpacity style={styles.menuButton} onPress={() => setMenuVisible(true)}>
             <Text style={styles.menuButtonText}>☰</Text>
           </TouchableOpacity>
@@ -216,14 +171,18 @@ const Chat = () => {
           <SideMenu
             List={chatSessions.map(s => ({ Id: s.sessionId, name: s.name }))}
             onSelect={async (sessionId) => {
-              const currentSession = chatSessions.find(s => s.sessionId === activeSessionId);
-              if (currentSession && shouldSaveChat(currentSession)) {
-                await saveChatToBackend(currentSession);
+              setActiveSessionId(sessionId); // Immediate UI update
+              setMenuVisible(false);         // Close menu fast
+
+              if (sessionId.startsWith('new')) {
+                const exists = chatSessions.find(s => s.sessionId === sessionId);
+                if (!exists) {
+                  const session = await createNewSession(userId);
+                  setChatSessions(prev => [session, ...prev]);
+                }
+              } else {
+                await loadMessagesForSession(sessionId);
               }
-            
-              const session = switchSession(sessionId, chatSessions);
-              setActiveSessionId(session.sessionId);
-              setMenuVisible(false);
             }}
             onClose={() => setMenuVisible(false)}
             setMenuVisible={setMenuVisible}
@@ -240,19 +199,8 @@ const Chat = () => {
         />
 
         <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.input}
-            value={input}
-            onChangeText={setInput}
-            placeholder="Type your message..."
-            placeholderTextColor="#999"
-            editable={!isThinking}
-          />
-          <TouchableOpacity
-            onPress={sendMessage}
-            style={[styles.sendButton, isThinking && styles.disabledButton]}
-            disabled={isThinking}
-          >
+          <TextInput style={styles.input} value={input} onChangeText={setInput} placeholder="Type your message..." placeholderTextColor="#999" editable={!isThinking} />
+          <TouchableOpacity onPress={handleSendMessage } style={[styles.sendButton, isThinking && styles.disabledButton]} disabled={isThinking}>
             <Text style={styles.sendText}>Send</Text>
           </TouchableOpacity>
         </View>

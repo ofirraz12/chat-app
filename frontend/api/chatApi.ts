@@ -1,62 +1,72 @@
 import axios from 'axios';
 import { getAppSettings } from '@/config';
-import { ChatSession } from '@/types/chat';
+import { ChatSession, Message } from '@/types/chat';
 
 const { URL_backend } = getAppSettings();
 const API = axios.create({ baseURL: `${URL_backend}/llm/conversation` });
 
-/** Create a new conversation */
-export async function addConversation(user_id: number, session_id: string, title: string, conversation: ChatSession['messages']) {
+/** Create a new session (without messages) */
+export async function createSession(user_id: number, session_id: string, title: string) {
   try {
-    const response = await API.post('/', { user_id, session_id, title, conversation });
+    const response = await API.post('/session', { user_id, session_id, title });
     return response.data;
   } catch (error) {
-    console.error('Add Conversation Error:', error);
+    console.error('Create Session Error:', error);
     throw error;
   }
 }
 
-/** Update an existing conversation */
-export async function updateConversation(user_id: number, session_id: string, title: string, conversation: ChatSession['messages']) {
-    try {
-      const response = await API.put('/', { user_id, session_id, title, conversation });
-      return response.data;
-    } catch (error) {
-      console.error('Update Conversation Error:', error);
-      throw error;
-    }
-  }
-  
-
-/** Delete a conversation */
-export async function deleteConversation(user_id: number, session_id: string) {
+/** Save one message at a time */
+export async function sendMessage(user_id: number, session_id: string, role: string, message: string, send_at: string, model: 'groq' | 'ollama' = 'groq') {
   try {
-    const response = await API.delete('/', { data: { user_id, session_id } });
+    const response = await API.post('/message', { user_id, session_id, role, message, send_at, model });
     return response.data;
   } catch (error) {
-    console.error('Delete Conversation Error:', error);
+    console.error('Save Message Error:', error);
     throw error;
   }
 }
 
-/** Get recent N conversations for a user */
-export async function getRecentConversations(user_id: number, limit: number = 5) {
+/** Update the session's title */
+export async function updateSessionTitle(user_id: number, session_id: string, title: string) {
   try {
-    const response = await API.get(`/recent/${user_id}/${limit}`);
+    const response = await API.put('/session', { user_id, session_id, title });
     return response.data;
   } catch (error) {
-    console.error('Get Recent Conversations Error:', error);
+    console.error('Update Session Title Error:', error);
     throw error;
   }
 }
 
-/** Get all conversations for a user */
-export async function getAllConversations(user_id: number) {
+/** Fetch N latest messages for context */
+export async function getRecentMessages(user_id: number, session_id: string, limit: number = 20) {
   try {
-    const response = await API.get(`/all/${user_id}`);
+    const response = await API.get(`/message/${user_id}/${session_id}/${limit}`);
     return response.data;
   } catch (error) {
-    console.error('Get All Conversations Error:', error);
+    console.error('Get Recent Messages Error:', error);
+    throw error;
+  }
+}
+
+/** Fetch session */
+export async function getSessionMessages(user_id: number, session_id: string) {
+  try {
+    const response = await API.get(`/session/${user_id}/${session_id}`);
+    return response.data;
+  } catch (error) {
+    console.error('Get Session Messages Error:', error);
+    throw error;
+  }
+}
+
+/** Fetch all session headers (titles) */
+export async function getAllSessions(user_id: number) {
+  try {
+    const response = await API.get(`/sessions/${user_id}`);
+    return response.data;
+  } catch (error) {
+    console.error('Get All Sessions Error:', error);
     throw error;
   }
 }

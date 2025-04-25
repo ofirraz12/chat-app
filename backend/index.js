@@ -3,9 +3,13 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
+import http from 'http';
 import { fileURLToPath } from 'url';
 import { connectDB, closeDB } from './config/db.js';  // Use pool instead of client
 import { loadSummaries, getSummaries } from './routes/LLM/llm_routes.js';
+
+import { WebSocketServer } from 'ws';
+import { setupWebSocketConnection } from './routes/wsConnection/chatConnection.js';
 
 import UserAuthRoutes from './routes/User/UserAuth_routes.js';
 import UserSettingsRoutes from './routes/User/UserSettings_routes.js'; 
@@ -67,6 +71,15 @@ app.get('*', (req, res) => {
       res.status(404).send('not found');
     }
   });
+
+
+const server = http.createServer(app);
+const wss = new WebSocketServer({ server });
+
+wss.on('connection', (ws) => {
+  console.log('New WebSocket connection');
+  setupWebSocketConnection(ws); 
+});
 
 // Start the server
 app.listen(PORT, () => {

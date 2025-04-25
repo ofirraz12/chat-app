@@ -82,7 +82,7 @@ router.post('/message', async (req, res) => {
           "${user_prompt}"
           `;
 
-console.log("analysisScript: ", analysisScript)
+        console.log("analysisScript: ", analysisScript)
 
         let toolSelectionResponse;
         if (model === 'groq') {

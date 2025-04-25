@@ -1,15 +1,5 @@
 [
     {
-      "name": "find_weather",
-      "description": "Checks the current weather based on the user's location or message content.",
-      "contextType": "environmentInfo",
-      "useCases": [
-        "User asks about weather",
-        "Location-based training decisions",
-        "Suggesting indoor vs outdoor activities"
-      ]
-    },
-    {
         "name": "get_training_plan",
         "description": "Selects and returns a full weekly workout plan based on how many days per week the user can train.",
         "contextType": "trainingLogic",

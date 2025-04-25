@@ -1,11 +1,10 @@
-// types.ts
-export type Sender = 'user' | 'trainer' | 'thinking';
-
-export type Message = {
+export interface Message {
   id: string;
   text: string;
-  sender: Sender;
-};
+  sender: 'user' | 'trainer' | 'thinking';
+  send_at?: string;
+}
+
 
 export type ChatSession = {
   sessionId: string;
