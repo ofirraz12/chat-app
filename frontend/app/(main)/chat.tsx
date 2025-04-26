@@ -1,19 +1,17 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, TextInput, FlatList, TouchableOpacity, StyleSheet,
-  KeyboardAvoidingView, Platform, AppState
+  KeyboardAvoidingView, Platform
 } from 'react-native';
 import { getAppSettings } from '@/config';
 import SideMenu from '@/components/general/sideMenu';
-import { createNewSession, switchSession } from '@/utils/chat_utils';
+import { createNewSession } from '@/utils/chat_utils';
 import { ChatSession, Message } from '@/types/chat';
 import { SupportedModel } from '@/types/llm';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/context/authContext';
-
-import {
-  createSession, sendMessage, getAllSessions, getSessionMessages, updateSessionTitle
-} from '@/api/chatApi';
+import { chatWS } from '@/api/chatWS';
+import { getAllSessions, getSessionMessages, updateSessionTitle } from '@/api/chatApi';
 
 const Chat = () => {
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
@@ -21,10 +19,91 @@ const Chat = () => {
   const [input, setInput] = useState('');
   const [isThinking, setIsThinking] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
+  const [pendingMessage, setPendingMessage] = useState(null);
+
   const flatListRef = useRef<FlatList>(null);
   const { user } = useAuth();
   if (!user || !user.id) return null;
   const userId = user.id;
+
+  // Setup WebSocket once
+  useEffect(() => {
+    if (!chatWS.isConnected()) {
+      chatWS.connect();
+    }
+
+    chatWS.on('reply', handleWebSocketReply);
+    chatWS.on('error', (err) => {
+      console.error('WebSocket error:', err);
+      setIsThinking(false);
+    });
+
+    return () => {
+      chatWS.off('reply', handleWebSocketReply);  // Detach listener only
+    };
+  }, []);
+
+  useEffect(() => {
+    console.log('ChatSessions Updated:', chatSessions);
+  }, [chatSessions]);
+
+  const handleWebSocketReply = (data: any) => {
+    const trainerReply = data?.trainer_reply || 'Sorry, no reply.';
+    const sessionId = data.session_id || activeSessionId;
+    const tempSessionId = data.temp_id || null;
+    const title = data.title;
+  
+    if (!sessionId) return;
+  
+    console.log('Received WebSocket Reply:', { sessionId, tempSessionId, title, trainerReply });
+  
+    setChatSessions(prev => {
+      let updatedSessions = [...prev];
+  
+      if (tempSessionId && tempSessionId !== sessionId) {
+        updatedSessions = updatedSessions.map(session => {
+          if (session.sessionId === tempSessionId) {
+            return {
+              ...session,
+              sessionId,
+              name: title || session.name,
+              messages: session.messages.map(msg =>
+                msg.id === `thinking-${tempSessionId}`
+                  ? { id: Date.now().toString(), text: trainerReply, sender: 'trainer' as 'trainer' }
+                  : msg
+              )
+            };
+          }
+          return session;
+        });
+  
+        // Remove duplicates if any, keep only new sessionId
+        updatedSessions = updatedSessions.filter(session => session.sessionId !== tempSessionId || session.sessionId === sessionId);
+  
+        // Force update active session
+        setActiveSessionId(sessionId);
+      } else {
+        updatedSessions = updatedSessions.map(session => {
+          if (session.sessionId === sessionId) {
+            const updatedMessages = session.messages.map(msg =>
+              msg.id === `thinking-${sessionId}`
+                ? { id: Date.now().toString(), text: trainerReply, sender: 'trainer' as 'trainer' }
+                : msg
+            );
+            return { ...session, name: title || session.name, messages: updatedMessages };
+          }
+          return session;
+        });
+      }
+  
+      console.log('Updated Sessions:', updatedSessions);
+      return updatedSessions;
+    });
+  
+    setIsThinking(false);
+  };
+  
+  
 
   // Load sessions on mount
   useEffect(() => {
@@ -32,7 +111,7 @@ const Chat = () => {
       try {
         const result = await getAllSessions(userId);
         let sessions: ChatSession[] = [];
-  
+
         if (result.success && result.data.length > 0) {
           sessions = result.data.map((row: any) => ({
             sessionId: row.session_id,
@@ -40,12 +119,11 @@ const Chat = () => {
             messages: [],
           }));
         }
-  
-        // Create a new session locally, NOT saved to backend
+
         const newSession = await createNewSession(userId);
         setChatSessions([newSession, ...sessions]);
         setActiveSessionId(newSession.sessionId);
-  
+
       } catch (error) {
         console.error('Failed to load sessions:', error);
       }
@@ -53,7 +131,6 @@ const Chat = () => {
     loadSessions();
   }, []);
 
-  // Fetch messages for session when switching
   const loadMessagesForSession = async (sessionId: string) => {
     try {
       const result = await getSessionMessages(userId, sessionId);
@@ -78,73 +155,33 @@ const Chat = () => {
   const getCurrentSession = (): ChatSession | undefined =>
     chatSessions.find(session => session.sessionId === activeSessionId);
 
-  const getChatNameFromLLM = async (message: string): Promise<string> => {
-    if (message.length > 10) return `${message.slice(0, 10)}...`;
-    return message;
-  };
-
-  const handleSendMessage = async () => {
+  const handleSendMessage = () => {
     if (input.trim() === '' || isThinking || !activeSessionId) return;
-  
+
+    const thinkingId = `thinking-${activeSessionId}`;
     const userMessage: Message = {
-      id: Date().toString(),
+      id: Date.now().toString(),
       text: input,
       sender: 'user',
     };
-  
+    
     setChatSessions(prev => prev.map(session =>
       session.sessionId === activeSessionId
-        ? { ...session, messages: [...session.messages, userMessage, { id: 'thinking', text: 'Trainer is thinking...', sender: 'thinking' }] }
+        ? { ...session, messages: [...session.messages, userMessage, { id: thinkingId, text: 'Trainer is thinking...', sender: 'thinking' }] }
         : session
     ));
-  
+
     setInput('');
     setIsThinking(true);
-  
-    // Send message to backend
-    const response = await sendMessage(userId, activeSessionId, 'user', input, new Date().toLocaleString("sv-SE", { timeZone: "Asia/Jerusalem" }), getAppSettings().LLM_MODEL as SupportedModel);
-  
-    const trainerReply = response?.trainer_reply || 'Sorry, no reply.';
-  
-    // Handle sessionId change from backend
-    let updatedSessionId = activeSessionId;
-    if (response?.session_id && response.session_id !== activeSessionId) {
-      updatedSessionId = response.session_id;
-      setActiveSessionId(response.session_id);
-      setChatSessions(prev => prev.map(session =>
-        session.sessionId === activeSessionId
-          ? { ...session, sessionId: response.session_id }
-          : session
-      ));
-    }
-  
-    // Update name if needed
-    const currentSession = chatSessions.find(session => session.sessionId === updatedSessionId);
-    let updatedName = currentSession?.name || 'New Chat';
-  
-    if (response?.title && updatedName === 'New Chat') {
-      updatedName = response.title;
-      await updateSessionTitle(userId, updatedSessionId, updatedName);
-    }
-  
-    // Update trainer reply
-    setChatSessions(prev =>
-      prev.map(session => {
-        if (session.sessionId === updatedSessionId) {
-          const updatedMessages: Message[] = session.messages.map(msg =>
-            msg.id === 'thinking'
-              ? { id: Date.now().toString(), text: trainerReply, sender: 'trainer' as 'trainer' }
-              : msg
-          );
-          return { ...session, messages: updatedMessages, name: updatedName };
-        }
-        return session;
-      })
-    );
-  
-    setIsThinking(false);
+    chatWS.sendMessage({
+      user_id: userId,
+      session_id: activeSessionId,
+      role: 'user',
+      message: input,
+      send_at: new Date().toLocaleString("sv-SE", { timeZone: "Asia/Jerusalem" }),
+      model: getAppSettings().LLM_MODEL as SupportedModel
+    });
   };
-  
 
   const renderItem = ({ item }: { item: Message }) => (
     item.sender === 'thinking' ? (
@@ -171,16 +208,9 @@ const Chat = () => {
           <SideMenu
             List={chatSessions.map(s => ({ Id: s.sessionId, name: s.name }))}
             onSelect={async (sessionId) => {
-              setActiveSessionId(sessionId); // Immediate UI update
-              setMenuVisible(false);         // Close menu fast
-
-              if (sessionId.startsWith('new')) {
-                const exists = chatSessions.find(s => s.sessionId === sessionId);
-                if (!exists) {
-                  const session = await createNewSession(userId);
-                  setChatSessions(prev => [session, ...prev]);
-                }
-              } else {
+              setActiveSessionId(sessionId);
+              setMenuVisible(false);
+              if (!sessionId.startsWith('new')) {
                 await loadMessagesForSession(sessionId);
               }
             }}
@@ -200,7 +230,7 @@ const Chat = () => {
 
         <View style={styles.inputContainer}>
           <TextInput style={styles.input} value={input} onChangeText={setInput} placeholder="Type your message..." placeholderTextColor="#999" editable={!isThinking} />
-          <TouchableOpacity onPress={handleSendMessage } style={[styles.sendButton, isThinking && styles.disabledButton]} disabled={isThinking}>
+          <TouchableOpacity onPress={handleSendMessage} style={[styles.sendButton, isThinking && styles.disabledButton]} disabled={isThinking}>
             <Text style={styles.sendText}>Send</Text>
           </TouchableOpacity>
         </View>

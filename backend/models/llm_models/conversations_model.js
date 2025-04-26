@@ -9,7 +9,7 @@ export const createSession = async (userId, sessionId, title = 'New Chat') => {
 };
 
 /** Save a single message */
-export const saveMessage = async (userId, sessionId, role, message, sendAt = new Date()) => {
+export const saveMessage = async (userId, sessionId, role, message, sendAt = new Date().toLocaleString("sv-SE", { timeZone: "Asia/Jerusalem" })) => {
   const text = `INSERT INTO user_messages (user_id, session_id, role, message, send_at) VALUES ($1, $2, $3, $4, $5) RETURNING *`;
   const values = [userId, sessionId, role, message, sendAt];
   const { rows } = await pool.query(text, values);
@@ -25,7 +25,7 @@ export const updateSessionTitle = async (userId, sessionId, newTitle) => {
 };
 
 /** Get N messages for context */
-export const getMessages = async (userId, sessionId, limit = 20) => {
+export const getMessages = async (userId, sessionId, limit = 10) => {
   const text = `SELECT role, message, send_at FROM user_messages WHERE user_id = $1 AND session_id = $2 ORDER BY send_at DESC LIMIT $3`;
   const values = [userId, sessionId, limit];
   const { rows } = await pool.query(text, values);

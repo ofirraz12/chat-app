@@ -8,6 +8,11 @@ export default ({ config }) => {
       ? process.env.EXPO_PUBLIC_PROD_URL_BACKEND
       : process.env.EXPO_PUBLIC_DEV_URL_BACKEND;
 
+  const WS_URL_backend =
+  APP_STATE === 'prod'
+    ? process.env.EXPO_PUBLIC_PROD_WS_URL_BACKEND
+    : process.env.EXPO_PUBLIC_DEV_WS_URL_BACKEND;
+
   return {
     ...config,
     android: {
@@ -21,6 +26,7 @@ export default ({ config }) => {
       URL_backend,
       LLM_MODEL: process.env.EXPO_PUBLIC_LLM_MODEL,
       APP_STATE,
+      WS_URL_backend,
     },
   };
 };

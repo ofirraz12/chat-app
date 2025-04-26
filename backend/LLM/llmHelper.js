@@ -4,6 +4,7 @@ import { handleGroqRequest } from '../services/groq_service.js';
 import { handleOllamaRequest } from '../services/ollama_service.js';
 import findFileRecursively from '../utils/findFile.js';
 import { runToolByName } from '../utils/toolRunner.js';
+import { getMessages } from '../models/llm_models/conversations_model.js';
 
 const assessmentDir = path.join(process.cwd(), 'LLM', 'assessment');
 let cachedToolsSummary = null;
@@ -18,12 +19,19 @@ export function loadSummaries() {
     }
 }
 
-export async function runLLMFlow({ context, user_prompt, user_style, model }) {
+export async function runLLMFlow({ user_id, session_id, user_prompt, user_style, model }) {
     loadSummaries();
+    const recentMessages = await getMessages(user_id, session_id, 10);
     const toolsSummary = cachedToolsSummary;
     const scriptsSummary = cachedScriptsSummary;
 
     const summarizedToolkit = { tools: toolsSummary, scripts: scriptsSummary };
+    const formattedContext = recentMessages.map(msg => {
+        const senderLabel = msg.role === 'user' ? 'User' : 'Trainer';
+        return `${senderLabel}: ${msg.message}`;
+    }).join('\n');
+
+    console.log('==== context: ===== \n', formattedContext)
 
     const analysisScript = `
           You are an intelligent planning assistant for a fitness trainer AI.
@@ -32,9 +40,9 @@ export async function runLLMFlow({ context, user_prompt, user_style, model }) {
           1. Think aloud and explain your reasoning **inside a <thinking> block**
           2. Then return the selected tools and scripts **inside an <answer> JSON array block**
           
-          User context: ${context}
+          context for the User prompt: ${formattedContext}
           User stage: ${user_style}
-          Your responses must work towards this goal examples can be: suggest a training plan, explore motivation, help them with scheduling, suggest beginner actions, etc.
+          Your responses must work towards a goal thats align with the user. examples can be: suggest a training plan, explore motivation, help them with scheduling, suggest beginner actions, etc.
 
           🧠 What to do:
           - Analyze user intent (goal, mindset, hesitation)
@@ -66,7 +74,7 @@ export async function runLLMFlow({ context, user_prompt, user_style, model }) {
         "${user_prompt}"
         `;
 
-    console.log("analysisScript: ", analysisScript)
+    console.log("'==== analysis script: ===== \n': ", analysisScript)
 
     let toolSelectionResponse;
     if (model === 'groq') {
@@ -77,7 +85,7 @@ export async function runLLMFlow({ context, user_prompt, user_style, model }) {
         throw new Error('Invalid model selection');
     }
 
-    console.log('Raw LLM Response:', toolSelectionResponse);
+    console.log('==== Raw LLM tool selection response: ===== \n', toolSelectionResponse);
 
     let reasoning = '';
     let selectedToolNames = [];
@@ -94,7 +102,7 @@ export async function runLLMFlow({ context, user_prompt, user_style, model }) {
         let jsonRaw = answerMatch[1].replace(/```(?:json)?/g, '').trim();
         jsonRaw = jsonRaw.replace(/,\s*]/g, ']');  // Fix: [, ] -> []
         jsonRaw = jsonRaw.replace(/,\s*}/g, '}');  // Fix: {, } -> {}
-        console.log('Cleaned JSON Raw:', jsonRaw);
+        console.log('==== Clean LLM tool selection response: ===== \n', jsonRaw);
         try {
             selectedToolNames = JSON.parse(jsonRaw);
         } catch (parseError) {
@@ -103,8 +111,6 @@ export async function runLLMFlow({ context, user_prompt, user_style, model }) {
         }
         reasoning = thinkingMatch ? thinkingMatch[1].trim() : '[No reasoning provided]';
         selectedToolNames = JSON.parse(jsonRaw);
-
-        console.log('🧠 LLM thinking:\n', reasoning);
 
     } catch (error) {
         console.error('❌ Failed to parse LLM output:', error.message);
@@ -120,18 +126,32 @@ export async function runLLMFlow({ context, user_prompt, user_style, model }) {
                 if (item.type === 'script') {
                     // It's a script
                     const filePath = findFileRecursively(assessmentDir, `${item.name}.json`);
-                    if (!filePath) throw new Error(`Script "${item.name}" not found`);
+                    if (!filePath) {
+                        console.warn(`Script "${item.name}" not found, skipping.`);
+                        continue;  // Skip to next item
+                    }
                     const script = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
                     scripts.push(script);
+            
                 } else if (item.type === 'tool') {
                     const toolName = item.name;
                     const toolParams = item.params || {};
-                    const filePath = findFileRecursively(assessmentDir, `${item.name}.js`);
-                    if (!filePath) throw new Error(`Tool "${toolName}" not found`);
-                    const output = await runToolByName(item.name, item.params || {});
-                    toolOutputs[toolName] = output;
+                    const filePath = findFileRecursively(assessmentDir, `${toolName}.js`);
+                    if (!filePath) {
+                        console.warn(`Tool "${toolName}" not found, skipping.`);
+                        continue;  // Skip invalid tool
+                    }
+                    try {
+                        const output = await runToolByName(toolName, toolParams);
+                        toolOutputs[toolName] = output;
+                    } catch (toolError) {
+                        console.error(`Error running tool "${toolName}":`, toolError.message || toolError);
+                    }
+                } else {
+                    console.warn(`Unknown item type "${item.type}", skipping.`);
                 }
-            }        
+            }
+             
     
             // 3. Build final prompt
             const combinedScripts = scripts.map(s => s.system_prompt).join('\n\n');
@@ -142,7 +162,7 @@ export async function runLLMFlow({ context, user_prompt, user_style, model }) {
             const finalPrompt = `
             importent instructions:
              - this is not a markdown chat this is text so do not add things like ** or ##
-             - remember the context of the conversation is ${context}
+             - remember the context of this text is ${formattedContext}
             ${combinedScripts}
     
             ${toolOutputText ? `Tool outputs:\n${toolOutputText}\n\n` : ''}
@@ -153,7 +173,7 @@ export async function runLLMFlow({ context, user_prompt, user_style, model }) {
     
             Trainer:
             `;
-            console.log("finalPrompt: ", finalPrompt)
+            console.log('==== Finalpromt: ===== \n', finalPrompt)
     
             let finalResponse;
             if (model === 'groq') {
@@ -162,7 +182,7 @@ export async function runLLMFlow({ context, user_prompt, user_style, model }) {
                 finalResponse = await handleOllamaRequest(finalPrompt);
             }
     
-            console.log('LLM Final Response:', finalResponse);
+            console.log('==== LLM response: ===== \n', finalResponse);
             return {
                 trainer_reply: finalResponse.trim()
             };
